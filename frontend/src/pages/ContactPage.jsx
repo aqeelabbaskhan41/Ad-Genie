@@ -220,7 +220,7 @@ function ContactPage() {
                             borderColor: '#d1d5db',
                             '--tw-ring-color': primaryColor
                           }}
-                          placeholder="John Doe"
+                          placeholder="Aqeel Abbas"
                         />
                       </div>
                       <div>
@@ -238,7 +238,7 @@ function ContactPage() {
                             borderColor: '#d1d5db',
                             '--tw-ring-color': primaryColor
                           }}
-                          placeholder="john@example.com"
+                          placeholder="aqeel@example.com"
                         />
                       </div>
                     </div>
