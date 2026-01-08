@@ -1,0 +1,7 @@
+{
+  "notify": false,
+  "ext": "js,json",
+  "ignore": ["node_modules", ".env"],
+  "watchedExtensions": ["js"],
+  "restartable": "rs"
+}
