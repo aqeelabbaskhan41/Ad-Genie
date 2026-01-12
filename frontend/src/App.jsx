@@ -13,6 +13,7 @@ import Footer from "./components/Footer";
 import ContactPage from "./pages/ContactPage";
 import BlogsPage from "./pages/BlogsPage";
 import ProfilePage from "./pages/ProfilePage";
+import AddModelPage from "./pages/AddModelPage";
 
 
 function App() {
@@ -94,6 +95,7 @@ function App() {
               </>
             } 
           />
+          <Route path="/add-model" element={<AddModelPage />} />
           <Route path="/editor" element={<ImageEditingPage />} />
         </Routes>
       </div>

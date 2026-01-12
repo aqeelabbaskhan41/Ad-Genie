@@ -1,512 +1,550 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  FaArrowRight,
-  FaImage,
+  FaPaperPlane,
   FaUpload,
   FaTimes,
   FaSpinner,
+  FaChevronDown,
+  FaBrain,
+  FaPlus,
   FaRegThumbsUp,
+  FaEdit,
+  FaTrash,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 
 function ChatbotPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  
+
   const primaryColor = "#5bf0a5";
-  const bgColor = "#000000";
-  const cardBg = "#111111";
-  const borderColor = "#222222";
-  const textPrimary = "#ffffff";
-  const mutedTextColor = "#888888";
-  
-  // Main states
+  const bgColor = "#000";
+  const cardBg = "#111";
+  const borderColor = "#222";
+  const textPrimary = "#fff";
+  const mutedTextColor = "#888";
+
+  /* ------------------ STATE ------------------ */
   const [messages, setMessages] = useState([
-    { 
-      id: 1, 
-      text: "Describe your ad idea or upload an image. I'll generate professional ads for you.", 
-      isUser: false, 
-      timestamp: new Date().toISOString(),
-      type: "text"
-    }
+    {
+      id: 1,
+      text: "Describe your ad idea or upload an image. I'll generate ads for you.",
+      isUser: false,
+      type: "text",
+    },
   ]);
   const [inputText, setInputText] = useState("");
   const [uploadedImage, setUploadedImage] = useState(null);
   const [uploadedImagePreview, setUploadedImagePreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
-  
-  
-  // Refs
+
+  const [selectedModel, setSelectedModel] = useState({ id: "default", name: "AdGenie" });
+  const [availableModels, setAvailableModels] = useState([{ id: "default", name: "AdGenie" }]);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  /* ------------------ REFS ------------------ */
   const fileInputRef = useRef(null);
+  const dropdownRef = useRef(null);
   const messagesEndRef = useRef(null);
-  
-  // Scroll to bottom of chat
+  const textareaRef = useRef(null);
+
+  /* ------------------ EFFECTS ------------------ */
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Check for returned edited image
   useEffect(() => {
-    if (location.state?.editedImage && location.state?.originalImage) {
-        setGeneratedImages(prev => prev.map(img => 
-            img.id === location.state.originalImage.id 
-            ? { ...img, url: location.state.editedImage }
-            : img
-        ));
-        
-        // Add message
-        setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: "Here is your edited image.",
-            isUser: false,
-            timestamp: new Date().toISOString(),
-            type: "text"
-        }]);
-
-        // Clear state so we don't re-process on refresh
-        window.history.replaceState({}, document.title)
+    const storedModels = JSON.parse(localStorage.getItem("customModels") || "[]");
+    if (storedModels.length > 0) {
+      setAvailableModels([{ id: "default", name: "AdGenie" }, ...storedModels]);
     }
-  }, [location.state]);
-  
-  // Handle file upload
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!file.type.match('image.*')) {
-        alert('Please upload an image file');
-        return;
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowModelDropdown(false);
       }
-      
-      if (file.size > 10 * 1024 * 1024) {
-        alert('File size should be less than 10MB');
-        return;
-      }
-      
-      setUploadedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target.result;
-        setUploadedImagePreview(imageUrl);
-        
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: `Uploaded: ${file.name}`,
-          isUser: true,
-          timestamp: new Date().toISOString(),
-          type: "image_upload",
-          imageUrl: imageUrl
-        }]);
-        
-        setTimeout(() => {
-          setMessages(prev => [...prev, {
-            id: Date.now() + 1,
-            text: "Perfect! Now describe what kind of ad you want me to create.",
-            isUser: false,
-            timestamp: new Date().toISOString(),
-            type: "text"
-          }]);
-        }, 300);
-      };
-      reader.readAsDataURL(file);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
+    }
+  }, [inputText]);
+
+  /* ------------------ DELETE MODEL ------------------ */
+  const handleDeleteModel = (modelId, e) => {
+    e.stopPropagation();
+    
+    if (modelId === "default") return; // Can't delete default model
+    
+    const updatedModels = availableModels.filter(model => model.id !== modelId);
+    setAvailableModels(updatedModels);
+    
+    // Also remove from localStorage if custom
+    const customModels = JSON.parse(localStorage.getItem('customModels') || '[]');
+    const updatedCustomModels = customModels.filter(model => model.id !== modelId);
+    localStorage.setItem('customModels', JSON.stringify(updatedCustomModels));
+    
+    // If deleted model was selected, switch to default
+    if (selectedModel.id === modelId) {
+      setSelectedModel(availableModels[0]);
     }
   };
-  
-  // Handle send message
-  const handleSendMessage = async () => {
-    if (!inputText.trim() && !uploadedImage) return;
-    
+
+  /* ------------------ IMAGE UPLOAD ------------------ */
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setUploadedImage(file);
+      setUploadedImagePreview(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /* ------------------ SEND MESSAGE ------------------ */
+  const handleSendMessage = () => {
+    if (!inputText.trim() && !uploadedImagePreview) return;
+
     const userMessage = {
       id: Date.now(),
-      text: inputText,
       isUser: true,
-      timestamp: new Date().toISOString(),
-      type: "text"
+      type: uploadedImagePreview ? "image_text" : "text",
+      text: inputText,
+      imageUrl: uploadedImagePreview || null,
     };
-    
-    if (uploadedImagePreview) {
-      userMessage.imageUrl = uploadedImagePreview;
-      userMessage.type = "image_with_text";
-    }
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInputText("");
+
+    setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
-    
-    setTimeout(async () => {
-      const mockImages = [
+
+    setTimeout(() => {
+      const mockAds = [
         {
-          id: 1,
-          url: uploadedImagePreview || "https://images.unsplash.com/photo-1556656793-08538906a9f8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-          prompt: inputText || "Modern tech ad for smartphones",
-          platform: "Instagram",
-          likes: 128,
-          downloads: 45,
-          engagement: "4.8% CTR",
-          createdAt: new Date().toISOString()
+          id: Date.now(),
+          url: uploadedImagePreview || "https://images.unsplash.com/photo-1556656793-08538906a9f8",
+          prompt: inputText || "Ad creative",
+          platform: selectedModel.name,
+          likes: Math.floor(Math.random() * 500) + 100,
+          engagement: (Math.random() * 3 + 2).toFixed(1) + "% CTR",
+          isGeneratedAd: true,
         },
         {
-          id: 2,
-          url: "https://images.unsplash.com/photo-1607082350899-7e105aa886ae?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-          prompt: inputText || "Fashion e-commerce summer collection",
-          platform: "Facebook",
-          likes: 89,
-          downloads: 32,
-          engagement: "3.2x ROAS",
-          createdAt: new Date().toISOString()
+          id: Date.now() + 1,
+          url: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43",
+          prompt: inputText || "Creative ad design",
+          platform: selectedModel.name,
+          likes: Math.floor(Math.random() * 300) + 50,
+          engagement: (Math.random() * 3 + 2).toFixed(1) + "% CTR",
+          isGeneratedAd: true,
         },
-        {
-          id: 3,
-          url: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-          prompt: inputText || "Food delivery service promotion",
-          platform: "Google Ads",
-          likes: 156,
-          downloads: 67,
-          engagement: "5.2% CTR",
-          createdAt: new Date().toISOString()
-        }
       ];
-      
-      setGeneratedImages(mockImages);
-      
-      setMessages(prev => [...prev, {
+
+      const botMessage = {
         id: Date.now() + 2,
-        text: "Generated 3 ad variations. Click any image to edit.",
         isUser: false,
-        timestamp: new Date().toISOString(),
-        type: "text"
-      }]);
-      
+        type: "ads_generated",
+        text: `I've generated ${mockAds.length} ad variations for you. Click any image to edit.`,
+        generatedAds: mockAds,
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+      setGeneratedImages(prev => [...prev, ...mockAds]);
+
+      setInputText("");
+      setUploadedImage(null);
+      setUploadedImagePreview(null);
       setIsLoading(false);
     }, 2000);
   };
-  
-  // Handle image click for editing
-  const handleImageEditClick = (image) => {
-    navigate('/editor', { state: { image: image.url, originalImage: image } });
-  };
-  
-  // Handle key press for send
+
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
-  
-  
+
+  const handleEditImage = (imageData) => {
+    navigate("/editor", {
+      state: {
+        image: imageData.url || imageData.imageUrl,
+        prompt: imageData.text || imageData.prompt || "",
+        metadata: {
+          platform: imageData.platform,
+          likes: imageData.likes,
+          engagement: imageData.engagement,
+          isGeneratedAd: imageData.isGeneratedAd,
+        },
+      },
+    });
+  };
+
+  const canSend = inputText.trim() || uploadedImagePreview;
+
   return (
-    <div className="min-h-screen" style={{ 
-      backgroundColor: bgColor,
-      fontFamily: "Inter, sans-serif",
-      color: textPrimary
-    }}>
-      
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 mt-8">
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Side - Simple Chat Input */}
-          <div className="lg:col-span-2">
-            <div style={{ 
-              backgroundColor: cardBg,
-              border: `1px solid ${borderColor}`,
-              borderRadius: '12px',
-              overflow: 'hidden'
-            }}>
-              {/* Chat Messages */}
-              <div className="p-6 h-[400px] overflow-y-auto">
-                {messages.map((message) => (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-4`}
-                  >
-                    <div style={{ 
-                      maxWidth: '80%',
-                      padding: '12px 16px',
-                      borderRadius: '16px',
-                      backgroundColor: message.isUser ? primaryColor : '#222222',
-                      color: message.isUser ? 'black' : textPrimary
-                    }}>
-                      {message.type === "text" && (
-                        <p>{message.text}</p>
-                      )}
-                      
-                      {message.imageUrl && (
-                        <div className="mt-2">
-                          <img 
-                            src={message.imageUrl} 
-                            alt="Uploaded preview" 
-                            className="rounded-lg max-w-full max-h-48 object-cover"
-                            style={{ border: `1px solid ${borderColor}` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-                
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div style={{ 
-                      padding: '12px 16px',
-                      borderRadius: '16px',
-                      backgroundColor: '#222222'
-                    }}>
-                      <div className="flex items-center gap-3">
-                        <FaSpinner className="animate-spin" style={{ color: primaryColor }} />
-                        <span>Generating ads...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div ref={messagesEndRef} />
-              </div>
-              
-              {/* Chat Input Area */}
-<div
-  className="border-t px-3 py-2 sm:px-4 sm:py-3"
-  style={{ borderColor }}
->
-  <div className="flex items-center gap-2 sm:gap-3">
-    
-    {/* Upload Button */}
-    <button
-      onClick={() => fileInputRef.current.click()}
-      title="Upload image"
-      className="
-        flex items-center justify-center
-        w-11 h-11 sm:w-12 sm:h-12
-        rounded-lg
-        border
-        bg-[#222222]
-        shrink-0
-      "
-      style={{ borderColor }}
-    >
-      <FaUpload className="text-sm sm:text-base" style={{ color: textPrimary }} />
-    </button>
+    <div style={{ minHeight: "100vh", backgroundColor: bgColor, color: textPrimary }} className="flex flex-col">
+      {/* Add custom scrollbar styles */}
+      <style jsx global>{`
+        /* Custom scrollbar for textarea only */
+        textarea::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        textarea::-webkit-scrollbar-track {
+          background: #1a1a1a;
+          border-radius: 3px;
+        }
+        
+        textarea::-webkit-scrollbar-thumb {
+          background: ${primaryColor}80;
+          border-radius: 3px;
+        }
+        
+        textarea::-webkit-scrollbar-thumb:hover {
+          background: ${primaryColor};
+        }
+        
+        /* For Firefox */
+        textarea {
+          scrollbar-width: thin;
+          scrollbar-color: ${primaryColor}80 #1a1a1a;
+        }
+        
+        /* For the messages scroll area */
+        .messages-scroll-area::-webkit-scrollbar {
+          width: 4px;
+        }
+        
+        .messages-scroll-area::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        .messages-scroll-area::-webkit-scrollbar-thumb {
+          background: ${borderColor};
+          border-radius: 2px;
+        }
+        
+        .messages-scroll-area::-webkit-scrollbar-thumb:hover {
+          background: ${primaryColor}80;
+        }
 
-    <input
-      type="file"
-      ref={fileInputRef}
-      onChange={handleFileUpload}
-      accept="image/*"
-      className="hidden"
-    />
-
-    {/* Input + Send Wrapper */}
-    <div
-      className="
-        flex items-center
-        flex-1
-        gap-2
-        rounded-xl
-        border
-        bg-[#222222]
-        px-3
-      "
-      style={{ borderColor }}
-    >
-      {/* Textarea */}
-      <textarea
-        value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
-        onKeyDown={handleKeyPress}
-        placeholder="Describe your ad idea..."
-        rows={1}
-        className="
-          flex-1
-          resize-none
-          bg-transparent
-          py-3
-          text-sm sm:text-base
-          leading-6
-          focus:outline-none
-        "
-        style={{ color: textPrimary }}
-      />
-
-      {/* Send Button */}
-      <button
-        onClick={handleSendMessage}
-        disabled={isLoading || (!inputText.trim() && !uploadedImage)}
-        className="
-          flex items-center justify-center
-          w-9 h-9 sm:w-10 sm:h-10
-          rounded-lg
-          shrink-0
-          transition
-          disabled:opacity-40
-        "
-        style={{ backgroundColor: primaryColor, color: 'black' }}
-      >
-        <FaArrowRight className="text-sm sm:text-base" />
-      </button>
-    </div>
-  </div>
-
-  {/* Image Preview */}
-  {uploadedImagePreview && (
-    <div className="mt-2 flex items-center gap-3">
-      <div className="relative">
-        <img
-          src={uploadedImagePreview}
-          alt="Uploaded"
-          className="w-14 h-14 rounded-lg object-cover border"
-          style={{ borderColor }}
-        />
-
-        <button
-          onClick={() => {
-            setUploadedImage(null);
-            setUploadedImagePreview(null);
-          }}
-          className="
-            absolute -top-2 -right-2
-            w-5 h-5
-            rounded-full
-            bg-red-500
-            flex items-center justify-center
-          "
-        >
-          <FaTimes className="text-[10px] text-white" />
-        </button>
-      </div>
-
-      <span
-        className="text-xs sm:text-sm truncate max-w-[200px]"
-        style={{ color: mutedTextColor }}
-      >
-        {uploadedImage?.name}
-      </span>
-    </div>
-  )}
-</div>
-
-            </div>
-          </div>
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+          .mobile-flex-col {
+            flex-direction: column !important;
+          }
           
-          {/* Right Side - Generated Images */}
-          <div className="lg:col-span-1">
-            <div style={{ 
-              backgroundColor: cardBg,
-              border: `1px solid ${borderColor}`,
-              borderRadius: '12px',
-              height: '400px',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-              <div className="p-4 border-b" style={{ borderColor: borderColor }}>
-                <h3 className="font-semibold" style={{ color: textPrimary }}>Generated Ads</h3>
-                <p style={{ color: mutedTextColor, fontSize: '14px', marginTop: '4px' }}>
-                  {generatedImages.length} variations
-                </p>
+          .mobile-w-full {
+            width: 100% !important;
+          }
+          
+          .mobile-mt-2 {
+            margin-top: 8px !important;
+          }
+          
+          .mobile-text-sm {
+            font-size: 14px !important;
+          }
+          
+          .mobile-p-2 {
+            padding: 8px !important;
+          }
+        }
+      `}</style>
+
+      <div className="flex-1 flex flex-col max-w-6xl mx-auto w-full px-2 sm:px-3 md:px-4 py-2 sm:py-3 gap-2 sm:gap-3">
+        {/* Chat Messages */}
+        <div className="flex-1 flex flex-col rounded-xl md:rounded-2xl border overflow-hidden" style={{ backgroundColor: cardBg, borderColor }}>
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 messages-scroll-area">
+            {messages.length === 0 && (
+              <div className="flex items-center justify-center h-full min-h-[200px]" style={{ color: mutedTextColor }}>
+                <div className="text-center px-4">
+                  <div className="text-lg mb-2">👋 Welcome to AdGenie!</div>
+                  <p className="text-sm">Describe your ad idea or upload an image to get started.</p>
+                </div>
               </div>
-              
-              <div className="flex-1 overflow-y-auto p-4">
-                {generatedImages.length > 0 ? (
-                  <div className="space-y-4">
-                    {generatedImages.map((image) => (
-                      <motion.div
-                        key={image.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ scale: 1.02 }}
-                        className="cursor-pointer"
-                        onClick={() => handleImageEditClick(image)}
-                      >
-                        <div style={{ 
-                          backgroundColor: '#222222',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          border: `1px solid ${borderColor}`
-                        }}>
-                          <div className="relative">
-                            <img 
-                              src={image.url} 
-                              alt={image.prompt}
-                              style={{ 
-                                width: '100%',
-                                height: '120px',
-                                objectFit: 'cover'
-                              }}
-                            />
-                            <div style={{ 
-                              position: 'absolute',
-                              top: '8px',
-                              left: '8px',
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              backgroundColor: 'rgba(0,0,0,0.7)',
-                              fontSize: '12px',
-                              color: textPrimary
-                            }}>
-                              {image.platform}
-                            </div>
-                          </div>
-                          
-                          <div className="p-3">
-                            <p style={{ 
-                              fontSize: '14px',
-                              color: textPrimary,
-                              marginBottom: '8px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical'
-                            }}>
-                              {image.prompt}
-                            </p>
-                            
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1" style={{ color: mutedTextColor, fontSize: '12px' }}>
-                                  <FaRegThumbsUp /> {image.likes}
-                                </div>
-                              </div>
-                              <div style={{ 
-                                fontSize: '11px',
-                                padding: '2px 6px',
-                                borderRadius: '10px',
-                                backgroundColor: '#333333',
-                                color: mutedTextColor
-                              }}>
-                                {image.engagement}
+            )}
+            {messages.map((m) => (
+              <motion.div
+                key={m.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex ${m.isUser ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`px-3 py-2 sm:px-4 sm:py-3 rounded-xl max-w-[90%] sm:max-w-[85%] ${m.isUser ? "rounded-br-none" : "rounded-bl-none"}`}
+                  style={{ backgroundColor: m.isUser ? primaryColor : "#222", color: m.isUser ? "#000" : textPrimary }}
+                >
+                  {m.text && <p className="whitespace-pre-wrap break-words text-sm sm:text-base">{m.text}</p>}
+                  {m.imageUrl && !m.isGeneratedAd && (
+                    <img src={m.imageUrl} alt="Uploaded" className="mt-2 rounded-lg max-h-48 sm:max-h-60 w-auto max-w-full" />
+                  )}
+                  {m.generatedAds && (
+                    <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
+                      {m.generatedAds.map((ad) => (
+                        <motion.div key={ad.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="cursor-pointer group" onClick={() => handleEditImage(ad)}>
+                          <div className="rounded-lg overflow-hidden border transition-all group-hover:border-gray-500" style={{ borderColor }}>
+                            <div className="relative">
+                              <img src={ad.url} className="w-full h-32 sm:h-48 object-cover" alt="Generated ad" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2 sm:p-3">
+                                <span className="text-xs font-medium px-2 py-1 rounded flex items-center gap-1" style={{ backgroundColor: primaryColor, color: "#000" }}>
+                                  <FaEdit size={8} className="sm:size-10" /> <span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span>
+                                </span>
                               </div>
                             </div>
+                            <div className="p-2 sm:p-3 bg-[#0f0f0f]">
+                              <div className="flex justify-between items-center mb-1 sm:mb-2">
+                                <span className="text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded" style={{ backgroundColor: primaryColor + "20", color: primaryColor }}>
+                                  {isMobile ? ad.platform.substring(0, 3) : ad.platform}
+                                </span>
+                                <span className="text-xs flex items-center gap-0.5 sm:gap-1" style={{ color: mutedTextColor }}>
+                                  <FaRegThumbsUp size={8} className="sm:size-10" /> <span className="text-xs">{ad.likes}</span>
+                                </span>
+                              </div>
+                              <p className="text-xs sm:text-sm line-clamp-2" style={{ color: textPrimary }}>{ad.prompt}</p>
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                    <div style={{ 
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '16px',
-                      opacity: 0.2
-                    }}>
-                      <FaImage style={{ color: primaryColor, fontSize: '40px' }} />
+                        </motion.div>
+                      ))}
                     </div>
-                    <p style={{ color: mutedTextColor, fontSize: '14px' }}>
-                      No ads generated yet
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
+              </motion.div>
+            ))}
+            {isLoading && (
+              <div className="flex items-center gap-2 text-sm" style={{ color: mutedTextColor }}>
+                <FaSpinner className="animate-spin" /> 
+                <span className="text-sm">Generating ads...</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Bar - Responsive */}
+          <div className="border-t p-2 sm:p-3 flex flex-col gap-2" style={{ borderColor }}>
+            {/* Image Preview - Mobile friendly */}
+            {uploadedImagePreview && (
+              <div className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: "#1a1a1a" }}>
+                <img 
+                  src={uploadedImagePreview} 
+                  alt="Preview" 
+                  className="h-10 w-10 sm:h-12 sm:w-12 object-cover rounded-lg cursor-pointer border flex-shrink-0" 
+                  style={{ borderColor }} 
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs sm:text-sm truncate block" style={{ color: textPrimary }}>
+                    {uploadedImage?.name ? (uploadedImage.name.length > 20 ? uploadedImage.name.substring(0, 20) + "..." : uploadedImage.name) : "Image to send"}
+                  </span>
+                  <span className="text-xs" style={{ color: mutedTextColor }}>Ready to send</span>
+                </div>
+                <button 
+                  onClick={() => { setUploadedImage(null); setUploadedImagePreview(null); }} 
+                  className="p-1.5 sm:p-2 rounded-lg hover:bg-[#222] transition-colors"
+                >
+                  <FaTimes size={14} className="sm:size-16" style={{ color: mutedTextColor }} />
+                </button>
+              </div>
+            )}
+
+            {/* Input Controls - Responsive layout */}
+            <div className={`flex gap-2 ${isMobile ? 'mobile-flex-col' : 'items-center'}`}>
+              {/* Left side controls - Mobile becomes first row */}
+              <div className={`flex gap-2 ${isMobile ? 'w-full justify-between mobile-mb-2' : ''}`}>
+                {/* Upload Button */}
+                <button
+                  onClick={() => fileInputRef.current.click()}
+                  className={`rounded-lg flex items-center justify-center hover:opacity-80 transition-opacity ${isMobile ? 'w-10 h-10' : 'w-10 h-10 sm:w-11 sm:h-11'}`}
+                  style={{ backgroundColor: "#222" }}
+                  title="Upload Image"
+                >
+                  <FaUpload size={isMobile ? 14 : 16} style={{ color: textPrimary }} />
+                </button>
+                <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
+
+                {/* Model Selector - Responsive */}
+                <div className={`relative ${isMobile ? 'flex-1' : ''}`} ref={dropdownRef}>
+                  <button
+                    onClick={() => setShowModelDropdown(!showModelDropdown)}
+                    className={`flex items-center gap-1.5 sm:gap-2 rounded-lg hover:opacity-90 transition-opacity ${isMobile ? 'h-10 px-2 w-full' : 'h-10 sm:h-11 px-2 sm:px-3'}`}
+                    style={{ backgroundColor: "#1a1a1a", borderColor, borderWidth: "1px" }}
+                  >
+                    <FaBrain size={isMobile ? 12 : 14} style={{ color: "#fff" }} />
+                    <span style={{ color: primaryColor, fontSize: isMobile ? "12px" : "14px" }} className="truncate">
+                      {isMobile && selectedModel.name.length > 10 ? selectedModel.name.substring(0, 8) + "..." : selectedModel.name}
+                    </span>
+                    <FaChevronDown size={isMobile ? 8 : 10} style={{ color: mutedTextColor }} />
+                  </button>
+
+                  {showModelDropdown && (
+                    <div 
+                      className={`absolute ${isMobile ? 'bottom-full mb-1 left-0 right-0' : 'bottom-full mb-2 left-0'} bg-[#111] border rounded-xl z-30 shadow-lg`}
+                      style={{ borderColor, width: isMobile ? '100%' : '240px' }}
+                    >
+                      {/* Default model always first */}
+                      <button
+                        key="default"
+                        onClick={() => {
+                          setSelectedModel(availableModels[0]);
+                          setShowModelDropdown(false);
+                        }}
+                        className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-[#222] text-sm transition-colors border-b"
+                        style={{ borderColor }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FaBrain size={12} style={{ color: primaryColor }} />
+                          <span>AdGenie</span>
+                        </div>
+                        {selectedModel.id === "default" && (
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+                        )}
+                      </button>
+
+                      {/* Custom models */}
+                      {availableModels.filter(model => model.id !== "default").map((model) => (
+                        <div key={model.id} className="group relative">
+                          <button
+                            onClick={() => {
+                              setSelectedModel(model);
+                              setShowModelDropdown(false);
+                            }}
+                            className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-[#222] text-sm transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span style={{ color: mutedTextColor }}>🔧</span>
+                              <span className="truncate">{model.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {selectedModel.id === model.id && (
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+                              )}
+                              <button
+                                onClick={(e) => handleDeleteModel(model.id, e)}
+                                className="p-1 rounded hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete model"
+                              >
+                                <FaTrash size={10} style={{ color: "#ef4444" }} />
+                              </button>
+                            </div>
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Add Model Button */}
+                      <button
+                        onClick={() => {
+                          setShowModelDropdown(false);
+                          navigate("/add-model");
+                        }}
+                        className="w-full px-3 py-2.5 flex items-center gap-2 text-sm hover:bg-[#222] transition-colors border-t"
+                        style={{ borderColor, color: primaryColor }}
+                      >
+                        <FaPlus size={10} /> Add Model
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Textarea and Send Button - Mobile becomes second row */}
+              <div className={`flex gap-2 ${isMobile ? 'w-full' : 'flex-1'}`}>
+                {/* Textarea */}
+                <textarea
+                  ref={textareaRef}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder={isMobile ? "Describe ad idea…" : "Describe your ad idea…"}
+                  rows={1}
+                  className={`bg-[#1a1a1a] border rounded-xl px-3 sm:px-4 py-2 sm:py-3 resize-none transition-all focus:outline-none ${isMobile ? 'text-sm flex-1' : 'flex-1'}`}
+                  style={{ 
+                    borderColor: inputText.trim() ? primaryColor + "40" : (uploadedImagePreview ? primaryColor + "40" : borderColor), 
+                    color: textPrimary, 
+                    minHeight: isMobile ? "40px" : "44px", 
+                    maxHeight: "100px",
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                    boxShadow: inputText.trim() ? `0 0 0 1px ${primaryColor}40` : 'none'
+                  }}
+                />
+
+                {/* Send Button */}
+                <button
+                  disabled={!canSend}
+                  onClick={handleSendMessage}
+                  className={`rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 flex-shrink-0 ${isMobile ? 'w-10 h-10' : 'w-10 h-10 sm:w-12 sm:h-12'}`}
+                  style={{ 
+                    backgroundColor: primaryColor, 
+                    color: "#000",
+                    opacity: canSend ? 1 : 0.4,
+                    cursor: canSend ? "pointer" : "not-allowed"
+                  }}
+                  title="Send message"
+                >
+                  {isLoading ? (
+                    <FaSpinner className="animate-spin" size={isMobile ? 14 : 16} />
+                  ) : (
+                    <FaPaperPlane size={isMobile ? 14 : 16} />
+                  )}
+                </button>
               </div>
             </div>
+
+            {/* Helper text - Mobile hidden */}
+            <div className="text-xs text-center hidden sm:block" style={{ color: mutedTextColor }}>
+              Press Enter to send • Shift + Enter for new line
+            </div>
           </div>
+        </div>
+
+        {/* Quick Actions - Mobile optimized */}
+        <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2 px-2">
+          <button 
+            className="text-xs px-2.5 py-1.5 rounded-lg hover:opacity-80 transition-opacity whitespace-nowrap"
+            style={{ backgroundColor: "#222", color: mutedTextColor }}
+            onClick={() => setInputText("Generate ads for a tech startup product")}
+          >
+            {isMobile ? "Tech" : "Tech Startup"}
+          </button>
+          <button 
+            className="text-xs px-2.5 py-1.5 rounded-lg hover:opacity-80 transition-opacity whitespace-nowrap"
+            style={{ backgroundColor: "#222", color: mutedTextColor }}
+            onClick={() => setInputText("Create social media ads for fashion brand")}
+          >
+            {isMobile ? "Fashion" : "Fashion Brand"}
+          </button>
+          <button 
+            className="text-xs px-2.5 py-1.5 rounded-lg hover:opacity-80 transition-opacity whitespace-nowrap"
+            style={{ backgroundColor: "#222", color: mutedTextColor }}
+            onClick={() => setInputText("Generate food product advertisement")}
+          >
+            {isMobile ? "Food" : "Food Product"}
+          </button>
+          <button 
+            className="text-xs px-2.5 py-1.5 rounded-lg hover:opacity-80 transition-opacity whitespace-nowrap"
+            style={{ backgroundColor: "#222", color: mutedTextColor }}
+            onClick={() => setInputText("Create promotional content for mobile app")}
+          >
+            {isMobile ? "App" : "Mobile App"}
+          </button>
         </div>
       </div>
     </div>

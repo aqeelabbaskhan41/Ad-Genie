@@ -11,7 +11,11 @@ import TransformPanel from '../components/ImageEditor/TransformPanel';
 const ImageEditingPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const initialImage = location.state?.image;
+  
+  // FIX: Check multiple possible locations for the image URL
+  const initialImage = location.state?.image || 
+                     location.state?.originalImage?.url || 
+                     location.state?.originalImage?.imageUrl;
   
   const canvasRef = useRef(null);
   const fabricCanvasRef = useRef(null); // Valid Fabric instance
@@ -23,8 +27,15 @@ const ImageEditingPage = () => {
   const [imageSrc, setImageSrc] = useState(null);
 
   useEffect(() => {
+    console.log("Editor - Received location state:", location.state);
+    console.log("Editor - Initial image value:", initialImage);
+    
     if (initialImage) {
         setImageSrc(initialImage);
+    } else {
+        console.warn("No image provided to editor!");
+        // Don't redirect automatically to avoid breaking navigation during development
+        // navigate('/chat');
     }
   }, [initialImage]);
   
@@ -395,7 +406,15 @@ const ImageEditingPage = () => {
                   
 
               ) : (
-                  <div className="text-gray-500">No image loaded</div>
+                  <div className="text-gray-500 text-center">
+                    <p className="mb-4">No image loaded</p>
+                    <button 
+                      onClick={() => navigate('/chat')}
+                      className="px-4 py-2 rounded-lg bg-[#333] hover:bg-[#444] transition-colors"
+                    >
+                      Back to Chat
+                    </button>
+                  </div>
               )}
           </div>
 
