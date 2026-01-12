@@ -57,7 +57,7 @@ function BlogsPage() {
   ];
 
   const trendingTags = [
-    "AI Advertising", "CTR", "Video Ads", "ROI", 
+    "AI Advertising", "CTR", "Ads Editing", "ROI", 
     "A/B Testing", "Facebook", "Instagram", "Google", 
     "Personalization", "Automation"
   ];
@@ -125,7 +125,7 @@ function BlogsPage() {
     },
     {
       id: 5,
-      title: "Video Ads vs Static Images: Which Performs Better in 2025?",
+      title: "Editable Ads vs Static Images: Which Performs Better in 2025?",
       excerpt: "Comprehensive analysis of video and image ad performance across different platforms and audiences.",
       author: "David Kim",
       date: "Mar 5, 2025",

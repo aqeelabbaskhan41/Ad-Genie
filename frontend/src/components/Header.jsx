@@ -323,13 +323,7 @@ function Header() {
                       >
                         AI Ad Creation
                       </Link>
-                      <Link 
-                        to="/video-ads" 
-                        className="block w-full text-left py-2 px-3 rounded-lg hover:bg-gray-50"
-                        onClick={closeMobileMenu}
-                      >
-                        Video Ads
-                      </Link>
+                     
                       <Link 
                         to="/ad-editing" 
                         className="block w-full text-left py-2 px-3 rounded-lg hover:bg-gray-50"

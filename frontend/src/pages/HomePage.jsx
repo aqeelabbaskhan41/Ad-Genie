@@ -97,18 +97,7 @@ function HomePage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Left Content */}
             <div>
-              {/* Badge */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 border border-gray-800 bg-gray-900"
-              >
-                <IoSparkles className="text-white" />
-                <span className="font-semibold text-sm text-white">
-                  AI-Powered Ad Generation Platform
-                </span>
-              </motion.div>
+              
 
               {/* Main Heading */}
               <motion.h1
@@ -381,8 +370,8 @@ function HomePage() {
               },
               {
                 icon: <FaVideo />,
-                title: "Video Ads",
-                desc: "Create engaging video ads in minutes",
+                title: "Lates Blogs",
+                desc: "Read engaging blogs on same platform",
                 gradient: "from-purple-500 to-pink-500",
               },
               {
@@ -722,12 +711,7 @@ function HomePage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 border border-gray-800 bg-gray-900">
-              <IoSparkles className="text-white" />
-              <span className="font-semibold text-sm text-white">
-                Limited Time Offer
-              </span>
-            </div>
+          
             <h2 className="text-4xl font-bold mb-6 text-white">
               Ready to Transform Your
               <span style={{ color: primaryColor }}> Ad Creation?</span>
