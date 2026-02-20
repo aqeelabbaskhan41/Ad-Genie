@@ -16,6 +16,7 @@ const TextPanel = ({
   textProperties, 
   onUpdateText, 
   onAddText, 
+  onCancelAdd,
   onRemoveText,
   isAddingText
 }) => {
@@ -25,7 +26,13 @@ const TextPanel = ({
           <div className="p-4 flex flex-col items-center justify-center h-full text-center">
              <div className="animate-pulse text-[#5bf0a5] mb-4 text-4xl">●</div>
              <p className="text-white font-medium mb-2">Click on image</p>
-             <p className="text-gray-500 text-sm">Click anywhere on the canvas to place your text.</p>
+             <p className="text-gray-500 text-sm mb-4">Click and drag to draw a text box.</p>
+             <button 
+                onClick={onCancelAdd}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+             >
+                Cancel
+             </button>
           </div>
       );
   }
@@ -84,13 +91,13 @@ const TextPanel = ({
               type="range" 
               min="12" 
               max="200" 
-              value={textProperties.size} 
+              value={textProperties.size || 40} 
               onChange={(e) => onUpdateText('size', parseInt(e.target.value))}
               className="flex-1 accent-[#5bf0a5]"
             />
             <input 
                 type="number" 
-                value={textProperties.size}
+                value={textProperties.size || 40}
                 onChange={(e) => onUpdateText('size', Math.max(1, parseInt(e.target.value) || 0))}
                 className="w-16 bg-[#222] border border-[#333] rounded p-1 text-center text-white text-sm focus:border-[#5bf0a5] outline-none"
             />

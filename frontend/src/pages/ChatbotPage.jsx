@@ -121,7 +121,7 @@ function ChatbotPage() {
   };
 
   /* ------------------ SEND MESSAGE ------------------ */
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim() && !uploadedImagePreview) return;
 
     const userMessage = {
@@ -134,45 +134,79 @@ function ChatbotPage() {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    
+    // Clear input immediately
+    const currentPrompt = inputText; // Store for API call
+    setInputText("");
+    setUploadedImage(null);
+    setUploadedImagePreview(null);
 
-    setTimeout(() => {
-      const mockAds = [
-        {
-          id: Date.now(),
-          url: uploadedImagePreview || "https://images.unsplash.com/photo-1556656793-08538906a9f8",
-          prompt: inputText || "Ad creative",
-          platform: selectedModel.name,
-          likes: Math.floor(Math.random() * 500) + 100,
-          engagement: (Math.random() * 3 + 2).toFixed(1) + "% CTR",
-          isGeneratedAd: true,
-        },
-        {
-          id: Date.now() + 1,
-          url: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43",
-          prompt: inputText || "Creative ad design",
-          platform: selectedModel.name,
-          likes: Math.floor(Math.random() * 300) + 50,
-          engagement: (Math.random() * 3 + 2).toFixed(1) + "% CTR",
-          isGeneratedAd: true,
-        },
-      ];
+      try {
+        let generatedAds = [];
+        
+        // Check if using default/AdGenie model which is now connected to HPC
+        if (selectedModel.id === "default") {
+          const response = await fetch("http://localhost:5000/api/chatbot/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: currentPrompt })
+          });
 
-      const botMessage = {
-        id: Date.now() + 2,
-        isUser: false,
-        type: "ads_generated",
-        text: `I've generated ${mockAds.length} ad variations for you. Click any image to edit.`,
-        generatedAds: mockAds,
-      };
+          const data = await response.json();
 
-      setMessages((prev) => [...prev, botMessage]);
-      setGeneratedImages(prev => [...prev, ...mockAds]);
+          if (data.success) {
+            generatedAds = [{
+              id: Date.now(),
+              url: data.imageUrl,
+              prompt: data.prompt || currentPrompt,
+              platform: selectedModel.name,
+              likes: 0, // Freshly generated
+              engagement: "0% CTR", // Freshly generated
+              isGeneratedAd: true,
+              modelTime: data.modelTime,
+              genTime: data.genTime
+            }];
+          } else {
+             throw new Error("Failed to generate image");
+          }
+        } else {
+          // Fallback for custom models (keep mock behavior or TODO)
+           generatedAds = [
+            {
+              id: Date.now(),
+              url: uploadedImagePreview || "https://images.unsplash.com/photo-1556656793-08538906a9f8",
+              prompt: currentPrompt || "Ad creative",
+              platform: selectedModel.name,
+              likes: Math.floor(Math.random() * 500) + 100,
+              engagement: (Math.random() * 3 + 2).toFixed(1) + "% CTR",
+              isGeneratedAd: true,
+            }
+          ];
+        }
 
-      setInputText("");
-      setUploadedImage(null);
-      setUploadedImagePreview(null);
-      setIsLoading(false);
-    }, 2000);
+        const botMessage = {
+          id: Date.now() + 2,
+          isUser: false,
+          type: "ads_generated",
+          text: `I've generated ${generatedAds.length} ad variations for you. Click any image to edit.`,
+          generatedAds: generatedAds,
+        };
+
+        setMessages((prev) => [...prev, botMessage]);
+        setGeneratedImages(prev => [...prev, ...generatedAds]);
+
+      } catch (error) {
+        console.error("Generation error:", error);
+         const errorMessage = {
+          id: Date.now() + 2,
+          isUser: false,
+          type: "text",
+          text: "Sorry, I encountered an error generating your image. Please ensure the backend is running and the HPC model is accessible.",
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
   };
 
   const handleKeyPress = (e) => {
@@ -202,7 +236,7 @@ function ChatbotPage() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: bgColor, color: textPrimary }} className="flex flex-col">
       {/* Add custom scrollbar styles */}
-      <style jsx global>{`
+      <style>{`
         /* Custom scrollbar for textarea only */
         textarea::-webkit-scrollbar {
           width: 6px;
@@ -304,11 +338,11 @@ function ChatbotPage() {
                         <motion.div key={ad.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="cursor-pointer group" onClick={() => handleEditImage(ad)}>
                           <div className="rounded-lg overflow-hidden border transition-all group-hover:border-gray-500" style={{ borderColor }}>
                             <div className="relative">
-                              <img src={ad.url} className="w-full h-32 sm:h-48 object-cover" alt="Generated ad" />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2 sm:p-3">
-                                <span className="text-xs font-medium px-2 py-1 rounded flex items-center gap-1" style={{ backgroundColor: primaryColor, color: "#000" }}>
-                                  <FaEdit size={8} className="sm:size-10" /> <span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span>
-                                </span>
+                              <img src={ad.url} className="w-full h-auto object-contain bg-black/50" style={{ maxHeight: '500px' }} alt="Generated ad" />
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <button className="p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-md text-white border border-white/30 transition-colors shadow-lg" title="Edit Image">
+                                  <FaEdit size={14} />
+                                </button>
                               </div>
                             </div>
                             <div className="p-2 sm:p-3 bg-[#0f0f0f]">

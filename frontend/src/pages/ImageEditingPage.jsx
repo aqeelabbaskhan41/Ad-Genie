@@ -23,6 +23,17 @@ const ImageEditingPage = () => {
   
   // State
   const [activeToolId, setActiveToolId] = useState('filter'); // filter, adjust, text, transform, crop
+  
+  // Reset states when tool changes
+  useEffect(() => {
+    if (activeToolId !== 'text') {
+        setIsAddingText(false);
+    }
+    if (activeToolId !== 'crop') {
+        setCropData(prev => ({ ...prev, mode: false }));
+    }
+  }, [activeToolId]);
+
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [imageSrc, setImageSrc] = useState(null);
 
@@ -66,6 +77,8 @@ const ImageEditingPage = () => {
     translateX: 0,
     translateY: 0
   });
+
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const [textOverlays, setTextOverlays] = useState([]);
   const [selectedTextId, setSelectedTextId] = useState(null);
@@ -247,25 +260,33 @@ const ImageEditingPage = () => {
     setSelectedTextId(null);
   };
 
+  const handleTextCreate = (newTextObj) => {
+      addToHistory();
+      const newText = {
+        id: Date.now(),
+        text: newTextObj.text || "Double click to edit",
+        x: newTextObj.x || canvasSize.width / 2,
+        y: newTextObj.y || canvasSize.height / 2,
+        width: newTextObj.width || 200, // Sync width!
+        color: "#ffffff",
+        size: 40,
+        font: "Inter",
+        bold: false,
+        italic: false,
+        align: "center"
+      };
+      setTextOverlays(prev => [...prev, newText]);
+      setSelectedTextId(newText.id);
+      setEditingTextId(newText.id);
+      setIsAddingText(false);
+  };
+   
+  // Legacy click handler - kept for fallback or other canvas clicks
   const handleCanvasClick = (x, y) => {
       if (isAddingText) {
-          addToHistory();
-          const newText = {
-            id: Date.now(),
-            text: "Double click to edit",
-            x: x || canvasSize.width / 2,
-            y: y || canvasSize.height / 2,
-            color: "#ffffff",
-            size: 40,
-            font: "Inter",
-            bold: false,
-            italic: false,
-            align: "center"
-          };
-          setTextOverlays(prev => [...prev, newText]);
-          setSelectedTextId(newText.id);
-          setEditingTextId(newText.id); // Start editing immediately
-          setIsAddingText(false);
+          // If EditorCanvas handles creation via drag, this might be redundant or unused.
+          // But if user just CLICKS instead of drags, EditorCanvas should handle that too.
+          // We'll delegate ALL creation logic to EditorCanvas's event handlers now.
       } else {
           setSelectedTextId(null);
       }
@@ -293,7 +314,7 @@ const ImageEditingPage = () => {
         // Legacy single key update
         const key = idOrKey;
         const value = propsOrValue;
-        const targetId = editingTextId || selectedTextId || activeTool.selectedTextId;
+        const targetId = editingTextId || selectedTextId;
         if (targetId) {
              setTextOverlays(prev => prev.map(t => 
                 t.id === targetId ? { ...t, [key]: value } : t
@@ -302,11 +323,6 @@ const ImageEditingPage = () => {
     }
   };
   
-  const handleRemoveText = (id) => {
-      addToHistory();
-      setTextOverlays(prev => prev.filter(t => t.id !== id));
-      if (selectedTextId === id) setSelectedTextId(null);
-  };
 
   const handleTextDragStart = null;
   const handleTextDrag = null;
@@ -337,6 +353,20 @@ const ImageEditingPage = () => {
       document.body.removeChild(link);
   };
 
+  // Canvas Ref handler - Memoized to prevent re-renders
+  const handleFabricCanvasReady = React.useCallback((canvas) => {
+        fabricCanvasRef.current = canvas;
+  }, []);
+
+  const handleRemoveText = React.useCallback((id) => {
+        const targetId = id || selectedTextId;
+        if (targetId) {
+            setTextOverlays(prev => prev.filter(t => t.id !== targetId));
+            setSelectedTextId(null);
+            setEditingTextId(null);
+        }
+  }, [selectedTextId]);
+
   return (
     <div className="fixed inset-0 bg-[#1E1E1E] flex flex-col z-50 overflow-hidden font-sans text-white">
       {/* Header */}
@@ -350,6 +380,32 @@ const ImageEditingPage = () => {
              <div className="flex gap-2">
                  <button onClick={handleUndo} disabled={history.length === 0} className={`p-2 rounded ${history.length === 0 ? 'text-gray-600' : 'text-white hover:bg-white/10'}`}><FaUndo /></button>
                  <button onClick={handleRedo} disabled={redoStack.length === 0} className={`p-2 rounded ${redoStack.length === 0 ? 'text-gray-600' : 'text-white hover:bg-white/10'}`}><FaRedo /></button>
+             </div>
+             <span className="text-gray-600">|</span>
+             {/* Zoom Controls */}
+             <div className="flex items-center gap-2 bg-[#111] px-2 py-1 rounded-lg border border-[#333]">
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.max(0.1, prev - 0.1))} 
+                  className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded"
+                  title="Zoom Out"
+                >
+                  -
+                </button>
+                <span className="text-xs w-12 text-center text-gray-300">{Math.round(zoomLevel * 100)}%</span>
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.min(5, prev + 0.1))} 
+                  className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded"
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                <button 
+                  onClick={() => setZoomLevel(1)} 
+                  className="ml-1 text-xs text-[#5bf0a5] hover:underline px-1"
+                  title="Reset Zoom"
+                >
+                  Reset
+                </button>
              </div>
         </div>
         
@@ -372,7 +428,7 @@ const ImageEditingPage = () => {
           <EditorToolbar activeTool={activeToolId} setActiveTool={setActiveToolId} />
 
           {/* Canvas Area */}
-          <div className="flex-1 relative bg-[#0a0a0a] overflow-hidden flex items-center justify-center p-8">
+          <div className="flex-1 relative bg-[#0a0a0a] overflow-auto flex items-center justify-center p-8">
               {imageSrc ? (
                   <EditorCanvas 
                       imageSrc={imageSrc}
@@ -383,10 +439,11 @@ const ImageEditingPage = () => {
                       textOverlays={textOverlays}
                       cropData={cropData}
                       activeTool={{ id: activeToolId, selectedTextId }}
+                      zoomLevel={zoomLevel}
+                      isAddingText={isAddingText} // New prop
+                      onTextCreate={handleTextCreate} // New prop
                       
-                      onFabricCanvasReady={(canvas) => {
-                          fabricCanvasRef.current = canvas;
-                      }}
+                      onFabricCanvasReady={handleFabricCanvasReady}
                       onTextClick={(id) => {
                           setSelectedTextId(id);
                           setActiveToolId('text');
@@ -394,6 +451,7 @@ const ImageEditingPage = () => {
                       onCanvasClick={(x, y) => handleCanvasClick(x, y)}
                       onTextUpdate={handleUpdateText}
                       onTextBlur={handleTextBlur}
+                      onTextRemove={handleRemoveText} // Added prop
                       editingTextId={editingTextId}
                       
                       onTextDragEnd={handleTextDragEnd}
@@ -439,6 +497,7 @@ const ImageEditingPage = () => {
                       textProperties={textOverlays.find(t => t.id === selectedTextId) || {}}
                       onUpdateText={handleUpdateText}
                       onAddText={handleAddText}
+                      onCancelAdd={() => setIsAddingText(false)}
                       onRemoveText={handleRemoveText}
                       isAddingText={isAddingText}
                   />
