@@ -11,3 +11,5 @@ backend/.env
 .env
 .DS_Store
 stability api key.txt
+
+backend/uploads
