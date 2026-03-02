@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors')
+const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const modelRoutes = require('./routes/modelRoutes');
 const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -12,6 +14,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/models', modelRoutes);
+
+// Serve the uploads folder statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use(errorMiddleware);
 

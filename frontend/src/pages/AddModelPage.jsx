@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   FaArrowLeft, 
@@ -7,9 +7,12 @@ import {
   FaRobot,
   FaEye,
   FaEyeSlash,
-  FaInfoCircle
+  FaInfoCircle,
+  FaCogs,
+  FaChevronDown,
+  FaLink
 } from "react-icons/fa";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 function AddModelPage() {
   const navigate = useNavigate();
@@ -24,15 +27,37 @@ function AddModelPage() {
   const [modelName, setModelName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState("openai");
+  const [modelId, setModelId] = useState("");
+  const [endpointUrl, setEndpointUrl] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
+
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [navigate]);
 
   const providers = [
-    { id: "openai", name: "OpenAI", description: "GPT-4, DALL-E 3, GPT-3.5" },
-    { id: "anthropic", name: "Anthropic", description: "Claude-3, Claude-2" },
-    { id: "stability", name: "Stability AI", description: "SDXL, Stable Diffusion" },
-    { id: "midjourney", name: "Midjourney", description: "Midjourney API" },
-    { id: "custom", name: "Custom API", description: "Any compatible API" },
+    { id: "openai", name: "OpenAI", description: "DALL-E 3, DALL-E 2", needsModelId: true, modelIdPlaceholder: "dall-e-3" },
+    { id: "google", name: "Google Gemini", description: "Imagen 3 via Gemini API", needsModelId: true, modelIdPlaceholder: "imagen-3.0-generate-001" },
+    { id: "stability", name: "Stability AI", description: "SDXL, Stable Image Ultra", needsModelId: true, needsEndpoint: true, endpointOptional: true, modelIdPlaceholder: "core" },
+    { id: "huggingface", name: "Hugging Face", description: "Full repository ID required", needsModelId: true, needsEndpoint: true, endpointOptional: true, modelIdPlaceholder: "runwayml/stable-diffusion-v1-5" },
+    { id: "custom", name: "Other", description: "Any compatible API", needsModelId: true, needsEndpoint: true, modelIdPlaceholder: "model-name" },
   ];
 
   const handleSave = async (e) => {
@@ -44,36 +69,50 @@ function AddModelPage() {
 
     setIsSubmitting(true);
 
-    // Check for duplicate names
-    const existingModels = JSON.parse(localStorage.getItem('customModels') || '[]');
-    const isDuplicate = existingModels.some(model => 
-      model.name.toLowerCase() === modelName.toLowerCase()
-    );
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const token = localStorage.getItem('token');
+    
+    console.log('[AddModel] Token found in localStorage:', token ? (token.substring(0, 10) + "...") : "MISSING");
+    console.log('[AddModel] Target URL:', `${API_BASE}/models`);
 
-    if (isDuplicate) {
-      alert("A model with this name already exists");
+    try {
+      const response = await fetch(`${API_BASE}/models`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: modelName,
+          provider: provider,
+          apiKey: apiKey.trim(),
+          modelId: modelId || undefined,
+          endpointUrl: endpointUrl || undefined
+        })
+      });
+
+      if (response.status === 401) {
+        alert("Your session has expired. Please login again.");
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsSubmitting(false);
+        navigate('/chat');
+      } else {
+        alert(data.message || "Failed to add model");
+        setIsSubmitting(false);
+      }
+    } catch (error) {
+      console.error("Failed to add model:", error);
+      alert("An error occurred while connecting the model.");
       setIsSubmitting(false);
-      return;
     }
-
-    // Simulate save delay
-    setTimeout(() => {
-      const newModel = {
-        id: `model_${Date.now()}`,
-        name: modelName,
-        apiKey: apiKey,
-        provider: provider,
-        providerName: providers.find(p => p.id === provider)?.name || "Custom",
-        createdAt: new Date().toISOString(),
-        isActive: true,
-      };
-
-      const updatedModels = [...existingModels, newModel];
-      localStorage.setItem('customModels', JSON.stringify(updatedModels));
-
-      setIsSubmitting(false);
-      navigate('/chat');
-    }, 800);
   };
 
   return (
@@ -95,9 +134,9 @@ function AddModelPage() {
           </button>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold mb-3">Connect AI Model</h1>
+            <h1 className="text-2xl font-bold mb-3">Connect Image Generation Model</h1>
             <p className="text-sm" style={{ color: mutedTextColor }}>
-              Add your API key to use external AI models
+              Add your API keys to use external image generation engines
             </p>
           </div>
         </div>
@@ -122,16 +161,19 @@ function AddModelPage() {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaRobot style={{ color: mutedTextColor }} size={14} />
+                  <FaRobot style={{ color: focusedField === 'modelName' ? primaryColor : mutedTextColor }} size={14} />
                 </div>
                 <input
                   type="text"
                   value={modelName}
                   onChange={(e) => setModelName(e.target.value)}
-                  placeholder="My GPT-4 Model"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#1a1a1a] border focus:outline-none focus:ring-1 transition text-sm"
+                  onFocus={() => setFocusedField('modelName')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="My DALL-E 3 config"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#1a1a1a] border transition text-sm focus:outline-none"
                   style={{ 
-                    borderColor: modelName ? primaryColor + "40" : borderColor,
+                    borderColor: focusedField === 'modelName' ? primaryColor + "60" : borderColor,
+                    boxShadow: focusedField === 'modelName' ? `0 0 0 1px ${primaryColor}40` : 'none',
                     color: textPrimary,
                   }}
                   required
@@ -142,27 +184,142 @@ function AddModelPage() {
             {/* Provider Selection */}
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: textPrimary }}>
-                AI Provider
+                Image Engine / Provider
               </label>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-[#1a1a1a] border focus:outline-none focus:ring-1 transition text-sm"
-                style={{ 
-                  borderColor: borderColor,
-                  color: textPrimary,
-                }}
-              >
-                {providers.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  onFocus={() => setFocusedField('provider')}
+                  onBlur={() => setFocusedField(null)}
+                  className="w-full pl-10 pr-10 py-3 rounded-lg bg-[#1a1a1a] border transition text-sm text-left flex items-center justify-between focus:outline-none"
+                  style={{ 
+                    borderColor: focusedField === 'provider' || isDropdownOpen ? primaryColor + "60" : borderColor,
+                    boxShadow: focusedField === 'provider' || isDropdownOpen ? `0 0 0 1px ${primaryColor}40` : 'none',
+                    color: textPrimary,
+                  }}
+                >
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaCogs style={{ color: focusedField === 'provider' || isDropdownOpen ? primaryColor : mutedTextColor }} size={14} />
+                  </div>
+                  <span>{providers.find(p => p.id === provider)?.name || "Select Provider"}</span>
+                  <motion.div
+                    animate={{ rotate: isDropdownOpen ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <FaChevronDown style={{ color: primaryColor }} size={10} />
+                  </motion.div>
+                </button>
+
+                <AnimatePresence>
+                  {isDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-50 w-full mt-2 py-1 rounded-lg bg-[#111111] border overflow-hidden shadow-xl"
+                      style={{ borderColor: primaryColor + "40" }}
+                    >
+                      {providers.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setProvider(p.id);
+                            setIsDropdownOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm transition-colors flex flex-col gap-0.5"
+                          style={{ 
+                            backgroundColor: provider === p.id ? primaryColor + "15" : "transparent",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (provider !== p.id) e.currentTarget.style.backgroundColor = primaryColor + "10";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (provider !== p.id) e.currentTarget.style.backgroundColor = "transparent";
+                          }}
+                        >
+                          <span style={{ color: provider === p.id ? primaryColor : textPrimary, fontWeight: provider === p.id ? '600' : '400' }}>
+                            {p.name}
+                          </span>
+                          <span className="text-[10px]" style={{ color: mutedTextColor }}>
+                            {p.description}
+                          </span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               <p className="mt-1 text-xs" style={{ color: mutedTextColor }}>
                 {providers.find(p => p.id === provider)?.description}
               </p>
             </div>
+
+            {/* Model ID / Endpoint for specific providers */}
+            {providers.find(p => p.id === provider)?.needsModelId && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: textPrimary }}>
+                  Model Name / ID
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaRobot style={{ color: focusedField === 'modelId' ? primaryColor : mutedTextColor }} size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    value={modelId}
+                    onChange={(e) => setModelId(e.target.value)}
+                    onFocus={() => setFocusedField('modelId')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder={providers.find(p => p.id === provider)?.modelIdPlaceholder || "e.g., dall-e-3"}
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#1a1a1a] border transition text-sm focus:outline-none"
+                    style={{ 
+                      borderColor: focusedField === 'modelId' ? primaryColor + "60" : borderColor,
+                      boxShadow: focusedField === 'modelId' ? `0 0 0 1px ${primaryColor}40` : 'none',
+                      color: textPrimary,
+                    }}
+                    required
+                  />
+                </div>
+                <p className="mt-1 text-[10px]" style={{ color: mutedTextColor }}>
+                  {provider === 'huggingface' ? "The full repo name (e.g., runwayml/stable-diffusion-v1-5)" : "Specify which model to use from this provider"}
+                </p>
+              </div>
+            )}
+
+            {providers.find(p => p.id === provider)?.needsEndpoint && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: textPrimary }}>
+                  API Endpoint URL {providers.find(p => p.id === provider)?.endpointOptional && "(Optional)"}
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaLink style={{ color: focusedField === 'endpointUrl' ? primaryColor : mutedTextColor }} size={14} />
+                  </div>
+                  <input
+                    type="url"
+                    value={endpointUrl}
+                    onChange={(e) => setEndpointUrl(e.target.value)}
+                    onFocus={() => setFocusedField('endpointUrl')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder={provider === 'huggingface' ? "https://api-inference.huggingface.co/models/..." : "https://api.example.com/v1/generate"}
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#1a1a1a] border transition text-sm focus:outline-none"
+                    style={{ 
+                      borderColor: focusedField === 'endpointUrl' ? primaryColor + "60" : borderColor,
+                      boxShadow: focusedField === 'endpointUrl' ? `0 0 0 1px ${primaryColor}40` : 'none',
+                      color: textPrimary,
+                    }}
+                    required={!providers.find(p => p.id === provider)?.endpointOptional}
+                  />
+                </div>
+                {provider === 'huggingface' && (
+                  <p className="mt-1 text-[10px]" style={{ color: mutedTextColor }}>
+                    Leave blank to use the standard Hugging Face Inference API.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* API Key */}
             <div>
@@ -173,25 +330,30 @@ function AddModelPage() {
                 <button
                   type="button"
                   onClick={() => setShowApiKey(!showApiKey)}
-                  className="flex items-center gap-1 text-xs hover:opacity-80 transition"
+                  className="flex items-center gap-1.5 text-xs hover:opacity-80 transition py-1"
                   style={{ color: mutedTextColor }}
                 >
-                  {showApiKey ? <FaEyeSlash size={12} /> : <FaEye size={12} />}
-                  {showApiKey ? "Hide" : "Show"}
+                  <span className="flex items-center h-full">
+                    {showApiKey ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
+                  </span>
+                  <span className="leading-none">{showApiKey ? "Hide" : "Show"}</span>
                 </button>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaKey style={{ color: mutedTextColor }} size={14} />
+                  <FaKey style={{ color: focusedField === 'apiKey' ? primaryColor : mutedTextColor }} size={14} />
                 </div>
                 <input
                   type={showApiKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
+                  onFocus={() => setFocusedField('apiKey')}
+                  onBlur={() => setFocusedField(null)}
                   placeholder="sk-..."
-                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#1a1a1a] border focus:outline-none focus:ring-1 transition text-sm font-mono"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#1a1a1a] border transition text-sm font-mono focus:outline-none"
                   style={{ 
-                    borderColor: apiKey ? primaryColor + "40" : borderColor,
+                    borderColor: focusedField === 'apiKey' ? primaryColor + "60" : borderColor,
+                    boxShadow: focusedField === 'apiKey' ? `0 0 0 1px ${primaryColor}40` : 'none',
                     color: textPrimary,
                   }}
                   required
@@ -199,7 +361,7 @@ function AddModelPage() {
               </div>
               <p className="mt-2 text-xs flex items-start gap-1" style={{ color: mutedTextColor }}>
                 <FaInfoCircle size={10} className="mt-0.5 flex-shrink-0" />
-                Your API key is stored locally in your browser
+                Your API key is stored securely in our database
               </p>
             </div>
 
@@ -222,7 +384,7 @@ function AddModelPage() {
                 ) : (
                   <>
                     <FaSave size={14} />
-                    <span>Connect Model</span>
+                    <span>Connect Image Model</span>
                   </>
                 )}
               </button>
@@ -237,9 +399,9 @@ function AddModelPage() {
             Security Information
           </h3>
           <ul className="text-xs space-y-1" style={{ color: mutedTextColor }}>
-            <li>• API keys are stored locally in your browser</li>
-            <li>• Keys are never sent to our servers</li>
-            <li>• Clear browser data to remove stored keys</li>
+            <li>• API keys are stored securely in our database</li>
+            <li>• Keys are used only for your image generation requests</li>
+            <li>• Use the 'Delete' button to remove stored keys</li>
             <li>• Use environment variables in production</li>
           </ul>
         </div>

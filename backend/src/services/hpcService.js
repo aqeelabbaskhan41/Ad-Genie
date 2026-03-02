@@ -23,7 +23,11 @@ exports.generateImage = async (prompt) => {
       throw new Error('API returned unsuccessful status');
     }
   } catch (error) {
+    if (error.code === 'ECONNREFUSED') {
+        console.error('HPC API Error: Connection refused at ' + HPC_API_URL);
+        throw new Error('Image generation service unreachable. Please ensure the local model is running on port 7860.');
+    }
     console.error('HPC API Error:', error.message);
-    throw new Error('Failed to generate image from external model.');
+    throw new Error('Failed to generate image: ' + error.message);
   }
 };

@@ -14,6 +14,7 @@ import ContactPage from "./pages/ContactPage";
 import BlogsPage from "./pages/BlogsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AddModelPage from "./pages/AddModelPage";
+import PublicChatPage from "./pages/PublicChatPage";
 
 
 function App() {
@@ -45,7 +46,7 @@ function App() {
                 <div className="container mx-auto px-4 py-6">
                   <Header />
                 </div>
-                <div className="pt-24">
+                <div className="pt-12">
                   <ChatbotPage />
                 </div>
               </>
@@ -97,6 +98,7 @@ function App() {
           />
           <Route path="/add-model" element={<AddModelPage />} />
           <Route path="/editor" element={<ImageEditingPage />} />
+          <Route path="/share/:sessionId" element={<PublicChatPage />} />
         </Routes>
       </div>
     </Router>

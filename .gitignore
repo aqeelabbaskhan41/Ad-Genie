@@ -10,3 +10,4 @@ backend/.env
 # general
 .env
 .DS_Store
+stability api key.txt

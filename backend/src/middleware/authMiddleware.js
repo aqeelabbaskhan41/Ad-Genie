@@ -18,4 +18,18 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
-module.exports = authMiddleware;
+const optionalAuth = (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token && token !== 'null' && token !== 'undefined') {
+            const decoded = verifyToken(token);
+            req.userId = decoded.userId;
+        }
+        next();
+    } catch (err) {
+        // If token is invalid, just proceed without userId
+        next();
+    }
+};
+
+module.exports = { authMiddleware, optionalAuth };
