@@ -1,4 +1,4 @@
-const { verifyToken } = require('../services/jwtService');
+const { verifyToken, generateToken } = require('../services/jwtService');
 const { sendResponse } = require('../utils/response');
 const constants = require('../config/constants');
 
@@ -12,6 +12,12 @@ const authMiddleware = (req, res, next) => {
 
         const decoded = verifyToken(token);
         req.userId = decoded.userId;
+
+        // Sliding session: Generate new token and send it in header
+        const newToken = generateToken(decoded.userId);
+        res.setHeader('x-new-token', newToken);
+        res.setHeader('Access-Control-Expose-Headers', 'x-new-token');
+
         next();
     } catch (err) {
         sendResponse(res, 401, false, constants.ERRORS.INVALID_TOKEN);

@@ -14,6 +14,14 @@ import {
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 
+const STABILITY_MODELS = [
+  { id: "ultra", name: "Stable Image Ultra", endpoint: "https://api.stability.ai/v2beta/stable-image/generate/ultra", description: "Highest quality images with great detail" },
+  { id: "core", name: "Stable Image Core", endpoint: "https://api.stability.ai/v2beta/stable-image/generate/core", description: "Fast, high-quality generation for most use cases" },
+  { id: "sd3-large", name: "Stable Diffusion 3.0 Large", endpoint: "https://api.stability.ai/v2beta/stable-image/generate/sd3", description: "SD3 Large (8B parameters) for complex prompts" },
+  { id: "sd3-medium", name: "Stable Diffusion 3.0 Medium", endpoint: "https://api.stability.ai/v2beta/stable-image/generate/sd3", description: "SD3 Medium (2B parameters)" },
+  { id: "sdxl", name: "SDXL 1.0", endpoint: "https://api.stability.ai/v2beta/stable-image/generate/sdxl", description: "The classic high-performance base model" },
+];
+
 function AddModelPage() {
   const navigate = useNavigate();
   
@@ -55,7 +63,7 @@ function AddModelPage() {
   const providers = [
     { id: "openai", name: "OpenAI", description: "DALL-E 3, DALL-E 2", needsModelId: true, modelIdPlaceholder: "dall-e-3" },
     { id: "google", name: "Google Gemini", description: "Imagen 3 via Gemini API", needsModelId: true, modelIdPlaceholder: "imagen-3.0-generate-001" },
-    { id: "stability", name: "Stability AI", description: "SDXL, Stable Image Ultra", needsModelId: true, needsEndpoint: true, endpointOptional: true, modelIdPlaceholder: "core" },
+    { id: "stability", name: "Stability AI", description: "SDXL, SD3, Ultra, Core", needsModelId: false, needsStabilityModels: true },
     { id: "huggingface", name: "Hugging Face", description: "Full repository ID required", needsModelId: true, needsEndpoint: true, endpointOptional: true, modelIdPlaceholder: "runwayml/stable-diffusion-v1-5" },
     { id: "custom", name: "Other", description: "Any compatible API", needsModelId: true, needsEndpoint: true, modelIdPlaceholder: "model-name" },
   ];
@@ -285,6 +293,40 @@ function AddModelPage() {
                 <p className="mt-1 text-[10px]" style={{ color: mutedTextColor }}>
                   {provider === 'huggingface' ? "The full repo name (e.g., runwayml/stable-diffusion-v1-5)" : "Specify which model to use from this provider"}
                 </p>
+              </div>
+            )}
+
+            {/* Stability Model Selection */}
+            {providers.find(p => p.id === provider)?.needsStabilityModels && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: textPrimary }}>
+                  Stability AI Model
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  {STABILITY_MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setModelId(m.id);
+                        setEndpointUrl(m.endpoint);
+                      }}
+                      className="p-3 rounded-lg border text-left transition relative"
+                      style={{ 
+                        backgroundColor: modelId === m.id ? primaryColor + "10" : '#1a1a1a',
+                        borderColor: modelId === m.id ? primaryColor : borderColor,
+                      }}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-semibold" style={{ color: modelId === m.id ? primaryColor : textPrimary }}>
+                          {m.name}
+                        </span>
+                        {modelId === m.id && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor }}></div>}
+                      </div>
+                      <p className="text-[10px]" style={{ color: mutedTextColor }}>{m.description}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

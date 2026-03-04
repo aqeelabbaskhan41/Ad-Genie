@@ -15,6 +15,7 @@ import BlogsPage from "./pages/BlogsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AddModelPage from "./pages/AddModelPage";
 import PublicChatPage from "./pages/PublicChatPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 
 function App() {
@@ -42,14 +43,16 @@ function App() {
           <Route 
             path="/chat" 
             element={
-              <>
-                <div className="container mx-auto px-4 py-6">
-                  <Header />
-                </div>
-                <div className="pt-12">
-                  <ChatbotPage />
-                </div>
-              </>
+              <ProtectedRoute>
+                <>
+                  <div className="container mx-auto px-4 py-6">
+                    <Header />
+                  </div>
+                  <div className="pt-12">
+                    <ChatbotPage />
+                  </div>
+                </>
+              </ProtectedRoute>
             } 
           />
           <Route path="/pricing" element={
@@ -86,18 +89,20 @@ function App() {
             } 
           />
           <Route path="/profile" element={
-              <>
-                <div className="container mx-auto px-4 py-6">
-                  <Header />
-                </div>
-                <div className="pt-24">
-                  <ProfilePage />
-                </div>
-              </>
+              <ProtectedRoute>
+                <>
+                  <div className="container mx-auto px-4 py-6">
+                    <Header />
+                  </div>
+                  <div className="pt-24">
+                    <ProfilePage />
+                  </div>
+                </>
+              </ProtectedRoute>
             } 
           />
-          <Route path="/add-model" element={<AddModelPage />} />
-          <Route path="/editor" element={<ImageEditingPage />} />
+          <Route path="/add-model" element={<ProtectedRoute><AddModelPage /></ProtectedRoute>} />
+          <Route path="/editor" element={<ProtectedRoute><ImageEditingPage /></ProtectedRoute>} />
           <Route path="/share/:sessionId" element={<PublicChatPage />} />
         </Routes>
       </div>

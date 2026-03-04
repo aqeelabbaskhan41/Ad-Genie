@@ -37,6 +37,7 @@ const generateAdTool = {
  * @yields {Object} Chunks of text or the final result with an image
  */
 exports.handleChatStream = async function* (history, newMessage, userId, chatId, customModelConfig) {
+    console.log(`[Stream] Starting stream for user: ${userId}, chat: ${chatId}`);
     try {
         const systemPrompt = {
             role: "system",
@@ -169,17 +170,26 @@ exports.handleChatStream = async function* (history, newMessage, userId, chatId,
                         imageBase64 = response.data[0].b64_json;
                         genTime = 0; // OpenAI doesn't provide this directly in the same way
                     } else if (customModelConfig && customModelConfig.provider === 'stability') {
-                        // Handle Stability AI
-                        const hfModel = customModelConfig.modelId || "core"; 
-                        const endpoint = customModelConfig.endpointUrl || `https://api.stability.ai/v2beta/stable-image/generate/${hfModel}`;
+                        // Handle Stability AI v2beta endpoints
+                        const modelId = customModelConfig.modelId || "core"; 
+                        const endpoint = customModelConfig.endpointUrl || `https://api.stability.ai/v2beta/stable-image/generate/${modelId}`;
+                        
+                        console.log(`[Stability] Requesting model ${modelId} at ${endpoint}`);
 
-                        const response = await axios.postForm(
+                        // Using standard axios.post with multipart/form-data for maximum compatibility
+                        const FormData = require('form-data');
+                        const form = new FormData();
+                        form.append('prompt', generatedPrompt);
+                        form.append('output_format', 'webp');
+
+                        const response = await axios.post(
                             endpoint,
-                            { prompt: generatedPrompt, output_format: 'webp' },
+                            form,
                             {
                                 validateStatus: (status) => status < 500,
                                 responseType: 'arraybuffer',
                                 headers: { 
+                                    ...form.getHeaders(),
                                     Authorization: `Bearer ${customModelConfig.apiKey.trim()}`, 
                                     Accept: "image/*"
                                 },
@@ -188,13 +198,19 @@ exports.handleChatStream = async function* (history, newMessage, userId, chatId,
 
                         if (response.status === 200) {
                             imageBase64 = Buffer.from(response.data, 'binary').toString('base64');
+                            console.log('[Stability] Success: Received image binary');
                         } else {
                             let errorDetail = "";
                             try {
                                 const decoder = new TextDecoder();
-                                errorDetail = decoder.decode(response.data);
+                                const jsonError = JSON.parse(decoder.decode(response.data));
+                                errorDetail = jsonError.errors?.join(', ') || jsonError.message || JSON.stringify(jsonError);
                             } catch (e) {
-                                errorDetail = response.statusText;
+                                try {
+                                    errorDetail = Buffer.from(response.data).toString();
+                                } catch (e2) {
+                                    errorDetail = response.statusText;
+                                }
                             }
                             throw new Error(`Stability AI Error (${response.status}): ${errorDetail}`);
                         }
@@ -309,8 +325,8 @@ exports.handleChatStream = async function* (history, newMessage, userId, chatId,
         yield { type: 'final_result', resultType: 'text', text: fullContent };
 
     } catch (error) {
-        console.error("General Stream Logic Error:", error);
-        yield { type: 'text_chunk', content: "\n\n**Unexpected Error**: Something went wrong while processing the AI response." };
+        console.error("CRITICAL: General Stream Logic Error:", error);
+        yield { type: 'text_chunk', content: `\n\n**Unexpected Error**: Something went wrong while processing the AI response (${error.message || 'Internal Error'}).` };
         yield { type: "final_result", resultType: "text", text: "(Error occurred)" };
     }
 };

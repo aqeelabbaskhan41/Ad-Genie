@@ -76,10 +76,12 @@ exports.chat = async (req, res, next) => {
     res.end();
 
   } catch (error) {
+    console.error("Chat Controller Error:", error);
     if (!res.headersSent) {
-        next(error);
+        res.status(500).json({ success: false, message: error.message || "Internal server error" });
     } else {
         console.error("Stream error after headers sent:", error);
+        res.write(JSON.stringify({ type: 'text_chunk', content: "\n\n(Error processing response)" }) + "\n");
         res.end();
     }
   }
