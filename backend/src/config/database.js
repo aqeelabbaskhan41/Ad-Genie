@@ -2,8 +2,12 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/AdGenie';
-    
+    const MONGO_URI = process.env.MONGODB_URI;
+
+    if (!MONGO_URI) {
+      throw new Error('MONGODB_URI is not defined in environment variables');
+    }
+
     await mongoose.connect(MONGO_URI);
     console.log('MongoDB connected successfully');
     return mongoose.connection;
